@@ -165,6 +165,7 @@ def transform(req: TransformRequest) -> TransformResponse:
             adapted_text=adapted_text,
         )
         suggested_format = str(format_out.get("suggested_format", "") or "")
+        adapted_text = str(format_out.get("adapted_text", "") or adapted_text)
 
         if not adapted_text:
             raise ValueError("Persona agent returned empty adapted_text.")

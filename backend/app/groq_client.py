@@ -20,8 +20,25 @@ def _extract_first_json_object(text: str) -> str:
         raise ValueError("No JSON object start found in response.")
 
     depth = 0
+    in_string = False
+    escape = False
     for i in range(start, len(text)):
         ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+            continue
+
+        # Not in JSON string
+        if ch == '"':
+            in_string = True
+            continue
         if ch == "{":
             depth += 1
         elif ch == "}":
