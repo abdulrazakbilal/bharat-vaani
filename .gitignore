@@ -1,0 +1,6 @@
+backend/.env
+backend/feedback.db
+backend/app/__pycache__/
+frontend/node_modules/
+frontend/.next/
+*.pyc
