@@ -78,3 +78,21 @@ class GroqJSONClient:
         raw_json = _extract_first_json_object(result)
         return json.loads(raw_json)
 
+    def raw_call(
+        self,
+        *,
+        system: str,
+        user: str,
+        model: str | None = None,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+    ) -> str:
+        prompt = f"{system}\n\n{user}".strip()
+        response = self._client.chat.completions.create(
+            model=model or DEFAULT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return (response.choices[0].message.content or "").strip()
+

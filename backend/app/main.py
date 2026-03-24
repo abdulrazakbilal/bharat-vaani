@@ -13,10 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import edge_tts
 
 from .agents import (
-    cultural_context_agent,
-    emotion_tone_agent,
-    format_decision_agent,
-    persona_match_agent,
+    FALLBACK_TRANSFORM,
+    combined_transform_agent,
 )
 from .groq_client import GroqJSONClient
 from .models import (
@@ -133,56 +131,28 @@ async def audio(req: AudioRequest) -> AudioResponse:
 def transform(req: TransformRequest) -> TransformResponse:
     try:
         client = GroqJSONClient()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
-        tone_out = emotion_tone_agent(client, article_text=req.article_text)
-        detected_tone = str(tone_out.get("detected_tone", "unknown"))
-
-        cultural_out = cultural_context_agent(
-            client, article_text=req.article_text, region=req.user_profile.region
-        )
-        analogies_used = cultural_out.get("analogies_used", []) or []
-        cultural_notes = str(cultural_out.get("notes", "") or "")
-
-        persona_out = persona_match_agent(
+        out = combined_transform_agent(
             client,
             article_text=req.article_text,
             target_language=req.target_language,
             user_profile=req.user_profile,
-            detected_tone=detected_tone,
-            analogies_used=analogies_used,
-            cultural_notes=cultural_notes,
         )
-        adapted_text = str(persona_out.get("adapted_text", "") or "")
-        persona_score = float(persona_out.get("persona_score", 0.0) or 0.0)
-
-        format_out = format_decision_agent(
-            client,
-            user_profile=req.user_profile,
-            detected_tone=detected_tone,
-            adapted_text=adapted_text,
-        )
-        suggested_format = str(format_out.get("suggested_format", "") or "")
-        adapted_text = str(format_out.get("adapted_text", "") or adapted_text)
-
-        if not adapted_text:
-            raise ValueError("Persona agent returned empty adapted_text.")
-        if not suggested_format:
-            raise ValueError("Format agent returned empty suggested_format.")
-
         return TransformResponse(
-            adapted_text=adapted_text,
-            detected_tone=detected_tone,
-            analogies_used=analogies_used,
-            suggested_format=suggested_format,
-            persona_score=persona_score,
+            adapted_text=str(out.get("adapted_text", FALLBACK_TRANSFORM["adapted_text"])),
+            detected_tone=str(out.get("detected_tone", "unknown")),
+            analogies_used=out.get("analogies_used", []),
+            suggested_format=str(out.get("suggested_format", "short_summary")),
+            persona_score=float(out.get("persona_score", 0.0) or 0.0),
         )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transform failed: {e}")
+    except Exception:
+        # Never return 500 for transform; always provide fallback with HTTP 200.
+        return TransformResponse(
+            adapted_text=FALLBACK_TRANSFORM["adapted_text"],
+            detected_tone=FALLBACK_TRANSFORM["detected_tone"],
+            analogies_used=FALLBACK_TRANSFORM["analogies_used"],
+            suggested_format=FALLBACK_TRANSFORM["suggested_format"],
+            persona_score=FALLBACK_TRANSFORM["persona_score"],
+        )
 
 
 @app.post("/persona")
